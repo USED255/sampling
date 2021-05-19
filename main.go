@@ -6,6 +6,7 @@ import (
 	"github.com/d2r2/go-bh1750"
 	"github.com/d2r2/go-bsbmp"
 	"github.com/d2r2/go-i2c"
+	logger "github.com/d2r2/go-logger"
 	"github.com/robfig/cron"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -41,6 +42,8 @@ func main() {
 }
 
 func bh() uint16 {
+	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
+	logger.ChangePackageLogLevel("bh1750", logger.InfoLevel)
 	i2c, err := i2c.NewI2C(0x23, 1)
 	if err != nil {
 		log.Fatal(err)
@@ -59,6 +62,8 @@ func bh() uint16 {
 }
 
 func bmp() (float32, float32, float32) {
+	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
+	logger.ChangePackageLogLevel("bsbmp", logger.InfoLevel)
 	i2c, err := i2c.NewI2C(0x76, 1)
 	if err != nil {
 		log.Fatal(err)

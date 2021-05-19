@@ -30,7 +30,7 @@ func main() {
 	db.AutoMigrate(&sensor_sampling_data{})
 
 	sensor_task := cron.New()
-	err = sensor_task.AddFunc("0 0/10 * * * ?", sampling)
+	err = sensor_task.AddFunc("0 0/1 * * * ?", sampling)
 	if err != nil {
 		log.Fatalln(err)
 	}

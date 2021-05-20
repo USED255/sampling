@@ -9,6 +9,7 @@ import (
 	"github.com/d2r2/go-bsbmp"
 	"github.com/d2r2/go-i2c"
 	logger "github.com/d2r2/go-logger"
+	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -32,30 +33,41 @@ var db *gorm.DB
 var err error
 
 func main() {
+	defer log.Println("再见👋")
 	db, err = gorm.Open(sqlite.Open("sensor.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatal("failed to connect database")
 	}
-	db.AutoMigrate(&sensor_sampling_data{})
+	db.AutoMigrate(&sensor_sampling_data{}, &caiyun_sampling_date{})
 
 	sensor_sampling_task := cron.New()
 	err = sensor_sampling_task.AddFunc("0 0/1 * * * ?", sensor_sampling)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	sensor_sampling()
 	sensor_sampling_task.Start()
+	defer sensor_sampling_task.Stop()
 
 	caiyun_sampling_task := cron.New()
 	err = caiyun_sampling_task.AddFunc("0 0/15 * * * ?", caiyun_sampling)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	caiyun_sampling_task.Start()
-
-	sensor_sampling()
 	caiyun_sampling()
-	defer sensor_sampling_task.Stop()
+	caiyun_sampling_task.Start()
 	defer caiyun_sampling_task.Stop()
+
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.Default()
+	r.GET("/ping", ping)
+	//r.StaticFS("/", http.Dir("static"))
+	api := r.Group("/api/v1")
+	{
+		api.GET("/environmental_sampling_data", Get_environmental_sampling_data)
+	}
+	r.Run()
+
 	select {}
 }
 
@@ -141,4 +153,12 @@ func caiyun_sampling() {
 	res := buf.String()
 	log.Println(res)
 	db.Create(&caiyun_sampling_date{Response: string(res)})
+}
+
+func ping(c *gin.Context) {
+	c.String(http.StatusOK, "pong")
+}
+
+func Get_environmental_sampling_data(c *gin.Context) {
+
 }

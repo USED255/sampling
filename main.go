@@ -17,11 +17,12 @@ import (
 
 type sensor_sampling_data struct {
 	gorm.Model
-	Temperature float32 `gorm:"default:null"`
-	Humidity    float32 `gorm:"default:null"`
-	Pressure    float32 `gorm:"default:null"`
-	Altitude    float32 `gorm:"default:null"`
-	Illuminance float32 `gorm:"default:null"`
+	Temperature       float32 `gorm:"default:null"`
+	AHT20_Temperature float32 `gorm:"default:null"`
+	Humidity          float32 `gorm:"default:null"`
+	Pressure          float32 `gorm:"default:null"`
+	Altitude          float32 `gorm:"default:null"`
+	Illuminance       float32 //`gorm:"default:null"`
 }
 
 type caiyun_sampling_date struct {
@@ -61,7 +62,6 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.GET("/ping", ping)
-	//r.StaticFS("/", http.Dir("static"))
 	api := r.Group("/api/v1")
 	{
 		api.GET("/environmental_sampling_data", Get_environmental_sampling_data)
@@ -121,6 +121,21 @@ func bmp280_sampling() (float32, float32, float32, error) {
 	return temperature, altitude, pressure, nil
 }
 
+func aht20_sampling() (float32, float32, error) {
+	bus, err := i2c.NewI2C(0x38, 1)
+	if err != nil {
+		return 0, 0, err
+	}
+	aht20 := AHT20New(bus)
+	aht20.Configure()
+	aht20.Reset()
+	err = aht20.Read()
+	if err != nil {
+		return 0, 0, err
+	}
+	return aht20.Celsius(), aht20.RelHumidity(), nil
+}
+
 func sensor_sampling() {
 	temperature, altitude, pressure, err := bmp280_sampling()
 	if err != nil {
@@ -132,9 +147,14 @@ func sensor_sampling() {
 		log.Println(err)
 		return
 	}
-	log.Printf("Temperature = %v*C, Humidity = %v%%, Pressure = %vPa, Altitude=%vm, Illuminance= %vlux \n",
-		temperature, nil, pressure, altitude, float32(illuminance))
-	db.Create(&sensor_sampling_data{Temperature: temperature, Pressure: pressure, Altitude: altitude, Illuminance: float32(illuminance)})
+	aht20_temperature, humidity, err := aht20_sampling()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Printf("Temperature = %v*C, AHT20-Temperature = %v*C, Humidity = %v%%, Pressure = %vPa, Altitude=%.2fm, Illuminance= %vlux \n",
+		temperature, aht20_temperature, humidity, pressure, altitude/10, float32(illuminance))
+	db.Create(&sensor_sampling_data{Temperature: temperature, AHT20_Temperature: aht20_temperature, Humidity: humidity, Pressure: pressure, Altitude: altitude, Illuminance: float32(illuminance)})
 }
 
 func caiyun_sampling() {

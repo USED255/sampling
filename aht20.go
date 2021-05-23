@@ -8,8 +8,6 @@ import (
 )
 
 const (
-	Address = 0x38
-
 	CMD_INITIALIZE = 0xBE
 	CMD_STATUS     = 0x71
 	CMD_TRIGGER    = 0xAC
@@ -24,42 +22,41 @@ var (
 	ErrTimeout = errors.New("timeout")
 )
 
-func (i *AHT20) controllerTransmit(addr uint16, w []byte) error {
+// AHT20 wraps an I2C connection to an AHT20 AHT20.
+type AHT20 struct {
+	bus      *i2c.I2C
+	humidity uint32
+	temp     uint32
+}
+
+func (i *AHT20) controllerTransmit(w []byte) error {
 	_, err := i.bus.WriteBytes(w)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (i *AHT20) controllerReceive(addr uint16, r []byte) error {
+func (i *AHT20) controllerReceive(r []byte) error {
 	_, err := i.bus.ReadBytes(r)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (i *AHT20) Tx(addr uint16, w, r []byte) error {
+func (i *AHT20) Tx(w, r []byte) error {
 	if len(w) > 0 {
-		if err := i.controllerTransmit(addr, w); nil != err {
+		if err := i.controllerTransmit(w); nil != err {
 			return err
 		}
 	}
 
 	if len(r) > 0 {
-		if err := i.controllerReceive(addr, r); nil != err {
+		if err := i.controllerReceive(r); nil != err {
 			return err
 		}
 	}
 
 	return nil
-}
-
-// AHT20 wraps an I2C connection to an AHT20 AHT20.
-type AHT20 struct {
-	bus      *i2c.I2C
-	Address  uint16
-	humidity uint32
-	temp     uint32
 }
 
 // New creates a new AHT20 connection. The I2C bus must already be
@@ -67,10 +64,12 @@ type AHT20 struct {
 //
 // This function only creates the AHT20 object, it does not touch the AHT20.
 func AHT20New(bus *i2c.I2C) AHT20 {
-	return AHT20{
-		bus:     bus,
-		Address: Address,
+	aht20 := AHT20{
+		bus: bus,
 	}
+	//aht20.Reset()
+	aht20.Configure()
+	return aht20
 }
 
 // Configure the AHT20
@@ -83,20 +82,21 @@ func (d *AHT20) Configure() {
 	}
 
 	// Force initialization
-	d.Tx(d.Address, []byte{CMD_INITIALIZE, 0x08, 0x00}, nil)
+	d.Tx([]byte{CMD_INITIALIZE, 0x08, 0x00}, nil)
 	time.Sleep(10 * time.Millisecond)
 }
 
 // Reset the AHT20
 func (d *AHT20) Reset() {
-	d.Tx(d.Address, []byte{CMD_SOFTRESET}, nil)
+	d.Tx([]byte{CMD_SOFTRESET}, nil)
+	time.Sleep(20 * time.Millisecond)
 }
 
 // Status of the AHT20
 func (d *AHT20) Status() byte {
 	data := []byte{0}
 
-	d.Tx(d.Address, []byte{CMD_STATUS}, data)
+	d.Tx([]byte{CMD_STATUS}, data)
 
 	return data[0]
 }
@@ -106,12 +106,12 @@ func (d *AHT20) Status() byte {
 // The actual temperature and humidity are stored
 // and can be accessed using `Temp` and `Humidity`.
 func (d *AHT20) Read() error {
-	d.Tx(d.Address, []byte{CMD_TRIGGER, 0x33, 0x00}, nil)
+	d.Tx([]byte{CMD_TRIGGER, 0x33, 0x00}, nil)
 
 	data := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	for retry := 0; retry < 3; retry++ {
 		time.Sleep(80 * time.Millisecond)
-		err := d.Tx(d.Address, nil, data)
+		err := d.Tx(nil, data)
 		if err != nil {
 			return err
 		}
@@ -125,6 +125,20 @@ func (d *AHT20) Read() error {
 	}
 
 	return ErrTimeout
+}
+
+func (d *AHT20) ReadWithRetry(i int) error {
+	err := d.Read()
+	for {
+		if err == nil {
+			return nil
+		}
+		if i == 0 {
+			return err
+		}
+		err = d.Read()
+		i = i - 1
+	}
 }
 
 func (d *AHT20) RawHumidity() uint32 {

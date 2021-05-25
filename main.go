@@ -122,6 +122,7 @@ func bmp280_sampling() (float32, float32, float32, error) {
 }
 
 func aht20_sampling() (float32, float32, error) {
+	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	bus, err := i2c.NewI2C(0x38, 1)
 	if err != nil {
 		return 0, 0, err
@@ -149,7 +150,7 @@ func sensor_sampling() error {
 	}
 	log.Printf("Temperature = %v*C, AHT20-Temperature = %v*C, Humidity = %v%%, Pressure = %vPa, Altitude=%.2fm, Illuminance= %vlux \n",
 		temperature, aht20_temperature, humidity, pressure, altitude/10, float32(illuminance))
-	db.Create(&sensor_sampling_data{Temperature: temperature, AHT20_Temperature: aht20_temperature, Humidity: humidity, Pressure: pressure, Altitude: altitude, Illuminance: float32(illuminance)})
+	db.Create(&sensor_sampling_data{Temperature: temperature, AHT20_Temperature: aht20_temperature, Humidity: humidity, Pressure: pressure, Altitude: altitude / 10, Illuminance: float32(illuminance)})
 	return nil
 }
 
@@ -160,7 +161,7 @@ func sensor_sampling_with_retry(i int) {
 			return
 		}
 		if i == 0 {
-			log.Panicln(err)
+			log.Println(err)
 			return
 		}
 		err = sensor_sampling()
@@ -192,7 +193,7 @@ func caiyun_sampling_with_retry(i int) {
 			return
 		}
 		if i == 0 {
-			log.Panicln(err)
+			log.Println(err)
 			return
 		}
 		err = caiyun_sampling()

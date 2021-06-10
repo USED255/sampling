@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/d2r2/go-bh1750"
 	"github.com/d2r2/go-bsbmp"
@@ -23,11 +24,17 @@ type sensor_sampling_data struct {
 	Pressure          float32 //`gorm:"default:null"`
 	Altitude          float32 //`gorm:"default:null"`
 	Illuminance       float32 //`gorm:"default:null"`
+	Time_Consuming    float32 //`gorm:"default:null"`
+	bmp280_err        string  `gorm:"default:null"`
+	bh1750_err        string  `gorm:"default:null"`
+	aht20_err         string  `gorm:"default:null"`
 }
 
 type caiyun_sampling_date struct {
 	gorm.Model
-	Response string `gorm:"default:null"`
+	Response       string  `gorm:"default:null"`
+	Time_Consuming float32 `gorm:"default:null"`
+	Err            string  `gorm:"default:null"`
 }
 
 var db *gorm.DB
@@ -42,16 +49,16 @@ func main() {
 	db.AutoMigrate(&sensor_sampling_data{}, &caiyun_sampling_date{})
 
 	sensor_sampling_task := cron.New()
-	err = sensor_sampling_task.AddFunc("0 0/1 * * * ?", func() { sensor_sampling_with_retry(3) })
+	err = sensor_sampling_task.AddFunc("0 0/1 * * * ?", sensor_sampling_work)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	sensor_sampling()
+	sensor_sampling_work()
 	sensor_sampling_task.Start()
 	defer sensor_sampling_task.Stop()
 
 	caiyun_sampling_task := cron.New()
-	err = caiyun_sampling_task.AddFunc("0 0/15 * * * ?", func() { caiyun_sampling_with_retry(3) })
+	err = caiyun_sampling_task.AddFunc("0 0/15 * * * ?", caiyun_sampling_work)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -65,6 +72,7 @@ func main() {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/environmental_sampling_data", Get_environmental_sampling_data)
+		api.GET("/current_environmental_sampling_data", Get_current_environmental_sampling_data)
 	}
 	r.Run()
 
@@ -135,76 +143,46 @@ func aht20_sampling() (float32, float32, error) {
 	return aht20.Celsius(), aht20.RelHumidity(), nil
 }
 
-func sensor_sampling() error {
-	temperature, altitude, pressure, err := bmp280_sampling()
-	if err != nil {
-		return err
-	}
-	illuminance, err := bh1750_sampling()
-	if err != nil {
-		return err
-	}
-	aht20_temperature, humidity, err := aht20_sampling()
-	if err != nil {
-		return err
-	}
-	log.Printf("Temperature = %v*C, AHT20-Temperature = %v*C, Humidity = %v%%, Pressure = %vPa, Altitude=%.2fm, Illuminance= %vlux \n",
-		temperature, aht20_temperature, humidity, pressure, altitude/10, float32(illuminance))
-	db.Create(&sensor_sampling_data{Temperature: temperature, AHT20_Temperature: aht20_temperature, Humidity: humidity, Pressure: pressure, Altitude: altitude / 10, Illuminance: float32(illuminance)})
-	return nil
+func sensor_sampling() *sensor_sampling_data {
+	t1 := time.Now()
+	temperature, altitude, pressure, bmp280_err := bmp280_sampling()
+	illuminance, bh1750_err := bh1750_sampling()
+	aht20_temperature, humidity, aht20_err := aht20_sampling()
+	elapsed := float32(time.Since(t1).Microseconds()) * float32(1000000)
+	return &sensor_sampling_data{Temperature: temperature, AHT20_Temperature: aht20_temperature, Humidity: humidity, Pressure: pressure, Altitude: altitude / 10, Illuminance: float32(illuminance), Time_Consuming: elapsed, bmp280_err: bmp280_err.Error(), bh1750_err: bh1750_err.Error(), aht20_err: aht20_err.Error()}
 }
 
-func sensor_sampling_with_retry(i int) {
-	err := sensor_sampling()
-	for {
-		if err == nil {
-			return
-		}
-		if i == 0 {
-			log.Println(err)
-			return
-		}
-		err = sensor_sampling()
-		i = i - 1
-	}
+func sensor_sampling_work() {
+	data := sensor_sampling()
+	log.Printf("Temperature = %v*C, AHT20-Temperature = %v*C, Humidity = %v%%, Pressure = %vPa, Altitude = %.2fm, Illuminance = %vlux, Time-consuming = %vs\n",
+		data.Temperature, data.AHT20_Temperature, data.Humidity, data.Pressure, data.Altitude/10, float32(data.Illuminance), data.Time_Consuming)
+	db.Create(data)
 }
 
-func caiyun_sampling() error {
+func caiyun_sampling() *caiyun_sampling_date {
+	t1 := time.Now()
 	url := "https://api.caiyunapp.com/v2.5/OsND6NQQTmhh2yde/117.559364,39.764/realtime.json"
 	response, err := http.Get(url)
-	if err != nil {
-		return err
-	}
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(response.Body)
-	if err != nil {
-		return err
-	}
 	res := buf.String()
-	log.Println(res)
-	db.Create(&caiyun_sampling_date{Response: string(res)})
-	return nil
+	elapsed := float32(time.Since(t1).Microseconds()) * float32(1000000)
+	return &caiyun_sampling_date{Response: res, Time_Consuming: elapsed, Err: err.Error()}
 }
 
-func caiyun_sampling_with_retry(i int) {
-	err := caiyun_sampling()
-	for {
-		if err == nil {
-			return
-		}
-		if i == 0 {
-			log.Println(err)
-			return
-		}
-		err = caiyun_sampling()
-		i = i - 1
-	}
+func caiyun_sampling_work() {
+	db.Create(caiyun_sampling())
 }
 
 func ping(c *gin.Context) {
-	c.String(http.StatusOK, "pong")
+	//c.String(http.StatusOK, "pong")
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "time": time.Now().Format(time.RFC3339), "message": "pong"})
 }
 
 func Get_environmental_sampling_data(c *gin.Context) {
 
+}
+
+func Get_current_environmental_sampling_data(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "time": time.Now().Format(time.RFC3339), "sensor_sampling": sensor_sampling(), "caiyun_sampling": caiyun_sampling_a()})
 }

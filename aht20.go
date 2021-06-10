@@ -1,5 +1,7 @@
 package main
 
+//从github.com/tinygo-org/drivers/aht20/aht20.go引用并修改
+
 import (
 	"errors"
 	"time"
@@ -22,7 +24,7 @@ var (
 	ErrTimeout = errors.New("timeout")
 )
 
-// AHT20 wraps an I2C connection to an AHT20 AHT20.
+// AHT20 wraps an I2C connection(github.com/d2r2/go-i2c) to an AHT20 AHT20.
 type AHT20 struct {
 	bus      *i2c.I2C
 	humidity uint32

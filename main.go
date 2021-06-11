@@ -146,9 +146,18 @@ func aht20_sampling() (float32, float32, error) {
 func sensor_sampling() *sensor_sampling_data {
 	t1 := time.Now()
 	temperature, altitude, pressure, bmp280_err := bmp280_sampling()
+	if err != nil {
+		log.Println(bmp280_err)
+	}
 	illuminance, bh1750_err := bh1750_sampling()
+	if err != nil {
+		log.Println(bh1750_err)
+	}
 	aht20_temperature, humidity, aht20_err := aht20_sampling()
-	elapsed := float32(time.Since(t1).Microseconds()) * float32(1000000)
+	if err != nil {
+		log.Println(aht20_err)
+	}
+	elapsed := float32(time.Since(t1).Microseconds()) / float32(1000000)
 	return &sensor_sampling_data{Temperature: temperature, AHT20_Temperature: aht20_temperature, Humidity: humidity, Pressure: pressure, Altitude: altitude / 10, Illuminance: float32(illuminance), Time_Consuming: elapsed, bmp280_err: bmp280_err.Error(), bh1750_err: bh1750_err.Error(), aht20_err: aht20_err.Error()}
 }
 
@@ -163,11 +172,19 @@ func caiyun_sampling() *caiyun_sampling_date {
 	t1 := time.Now()
 	url := "https://api.caiyunapp.com/v2.5/OsND6NQQTmhh2yde/117.559364,39.764/realtime.json"
 	response, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return &caiyun_sampling_date{Time_Consuming: float32(time.Since(t1).Microseconds()) * float32(1000000), Err: err.Error()}
+	}
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(response.Body)
+	if err != nil {
+		log.Println(err)
+		return &caiyun_sampling_date{Time_Consuming: float32(time.Since(t1).Microseconds()) * float32(1000000), Err: err.Error()}
+	}
 	res := buf.String()
-	elapsed := float32(time.Since(t1).Microseconds()) * float32(1000000)
-	return &caiyun_sampling_date{Response: res, Time_Consuming: elapsed, Err: err.Error()}
+	elapsed := float32(time.Since(t1).Microseconds()) / float32(1000000)
+	return &caiyun_sampling_date{Response: res, Time_Consuming: elapsed}
 }
 
 func caiyun_sampling_work() {
@@ -176,7 +193,9 @@ func caiyun_sampling_work() {
 
 func ping(c *gin.Context) {
 	//c.String(http.StatusOK, "pong")
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "time": time.Now().Format(time.RFC3339), "message": "pong"})
+	res := gin.H{"status": http.StatusOK, "time": time.Now().Format(time.RFC3339), "message": "pong"}
+	log.Println(res)
+	c.JSON(http.StatusOK, res)
 }
 
 func Get_environmental_sampling_data(c *gin.Context) {
@@ -184,5 +203,5 @@ func Get_environmental_sampling_data(c *gin.Context) {
 }
 
 func Get_current_environmental_sampling_data(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "time": time.Now().Format(time.RFC3339), "sensor_sampling": sensor_sampling(), "caiyun_sampling": caiyun_sampling_a()})
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "time": time.Now().Format(time.RFC3339), "sensor_sampling": sensor_sampling(), "caiyun_sampling": caiyun_sampling()})
 }

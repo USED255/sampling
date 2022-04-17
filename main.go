@@ -21,7 +21,7 @@ func main() {
 	}
 	log.Println("Welcome 🐱‍🏍")
 	r := gin.Default()
-	//r.SetTrustedProxies([]string{"192.168.0.0/24", "172.16.0.0/12", "10.0.0.0/8"})
+	r.SetTrustedProxies([]string{"192.168.0.0/24", "172.16.0.0/12", "10.0.0.0/8"})
 	api := r.Group("/api/v1")
 	{
 		api.GET("/ping",

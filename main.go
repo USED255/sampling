@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/d2r2/go-bh1750"
 	"github.com/d2r2/go-bsbmp"
@@ -10,7 +12,13 @@ import (
 	logger "github.com/d2r2/go-logger"
 	"github.com/gin-gonic/gin"
 	aht20 "github.com/used255/aht20-go"
+
+	"github.com/google/uuid"
 )
+
+var lastSamplingData gin.H
+var lastSamplingTime int64
+var isBusy = false
 
 func main() {
 	bindFlagPtr := flag.String("bind", ":8080", "bind address")
@@ -40,11 +48,32 @@ func sampling(c *gin.Context) {
 }
 
 func sampling_json() gin.H {
-	return gin.H{
+	if isBusy {
+		j := lastSamplingData
+		j["isBusy"] = true
+		return j
+	}
+	if lastSamplingTime != 0 && 1000 > getUnixMillisTimestamp()-lastSamplingTime {
+		j := lastSamplingData
+		j["UseDataFromOneSecondAgo"] = true
+		return j
+	}
+	isBusy = true
+	ts1 := getUnixMillisTimestamp()
+	samplingData := gin.H{
+		"status": http.StatusOK,
+		"uuid":   uuid.New().String(),
+		"ts1":    ts1,
 		"aht20":  aht20_sampling_json(),
 		"bh1750": bh1750_sampling_json(),
 		"bmp280": bmp280_sampling_json(),
 	}
+	ts2 := getUnixMillisTimestamp()
+	samplingData["ts2"] = ts2
+	lastSamplingTime = ts2
+	lastSamplingData = samplingData
+	isBusy = false
+	return samplingData
 }
 
 func aht20_sampling_json() gin.H {
@@ -139,4 +168,8 @@ func bmp280_sampling() (float32, float32, float32, error) {
 	}
 
 	return temperature, altitude, pressure, nil
+}
+
+func getUnixMillisTimestamp() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }

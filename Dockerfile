@@ -1,6 +1,6 @@
 FROM golang:1.17-alpine AS build
 
-WORKDIR /sensor
+WORKDIR /sampling
 COPY . .
 RUN go env -w CGO_ENABLED=0 &&\
     go build -v
@@ -9,5 +9,5 @@ RUN go env -w CGO_ENABLED=0 &&\
 FROM alpine:latest
 
 RUN apk add --no-cache tzdata
-ENTRYPOINT [ "/sensor" ]
-COPY --from=build /sensor/sensor /sensor
+ENTRYPOINT [ "/sampling" ]
+COPY --from=build /sampling/sampling /sampling

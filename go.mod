@@ -1,4 +1,4 @@
-module sensor
+module sampling
 
 go 1.17
 

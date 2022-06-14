@@ -11,7 +11,7 @@ import (
 	"github.com/d2r2/go-i2c"
 	logger "github.com/d2r2/go-logger"
 	"github.com/gin-gonic/gin"
-	aht20 "github.com/used255/aht20-go"
+	"github.com/used255/go-aht20"
 
 	"github.com/google/uuid"
 )

@@ -29,7 +29,7 @@ func main() {
 	}
 	log.Println("Welcome 🐱‍🏍")
 	r := gin.Default()
-	r.SetTrustedProxies([]string{"192.168.0.0/24", "172.16.0.0/12", "10.0.0.0/8"})
+	r.SetTrustedProxies([]string{"127.0.0.0/8", "192.168.0.0/24", "172.16.0.0/12", "10.0.0.0/8"})
 	api := r.Group("/api/v1")
 	{
 		api.GET("/ping",
@@ -38,87 +38,113 @@ func main() {
 					"message": "pong",
 				})
 			})
-		api.GET("/sampling", sampling)
+		api.GET("/sampling", getSampling)
 	}
 	r.Run(*bindFlagPtr)
 }
 
-func sampling(c *gin.Context) {
-	c.JSON(200, sampling_json())
+func getSampling(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"status":   http.StatusOK,
+		"sampling": sampling(),
+	})
 }
 
-func sampling_json() gin.H {
+func sampling() gin.H {
 	if isBusy {
 		j := lastSamplingData
 		j["isBusy"] = true
 		return j
 	}
-	if lastSamplingTime != 0 && 1000 > getUnixMillisTimestamp()-lastSamplingTime {
+
+	if lastSamplingTime != 0 && getUnixMillisTimestamp()-lastSamplingTime > 1000 {
 		j := lastSamplingData
-		j["UseDataFromOneSecondAgo"] = true
+		j["lastSamplingData"] = true
 		return j
 	}
+
 	isBusy = true
 	ts1 := getUnixMillisTimestamp()
-	samplingData := gin.H{
-		"status": http.StatusOK,
-		"uuid":   uuid.New().String(),
-		"ts1":    ts1,
-		"aht20":  aht20_sampling_json(),
-		"bh1750": bh1750_sampling_json(),
-		"bmp280": bmp280_sampling_json(),
+	j := gin.H{
+		"uuid": uuid.New().String(),
+		"ts1":  ts1,
+		"sensor": gin.H{
+			"aht20":  aht20Sampling(),
+			"bh1750": bh1750Sampling(),
+			"bmp280": bmp280Sampling(),
+		},
 	}
 	ts2 := getUnixMillisTimestamp()
-	samplingData["ts2"] = ts2
+	j["ts2"] = ts2
 	lastSamplingTime = ts2
-	lastSamplingData = samplingData
+	lastSamplingData = j
 	isBusy = false
-	return samplingData
-}
-
-func aht20_sampling_json() gin.H {
-	temperature, humidity, err := aht20_sampling()
-	j := gin.H{"temperature": temperature, "humidity": humidity}
-	if err != nil {
-		j["error"] = err.Error()
-	}
 	return j
 }
 
-func bh1750_sampling_json() gin.H {
-	amb, err := bh1750_sampling()
-	j := gin.H{"ambient": amb}
+func aht20Sampling() gin.H {
+	temperature, humidity, err := samplingAHT20()
 	if err != nil {
-		j["error"] = err.Error()
+		return gin.H{"error": err.Error()}
 	}
-	return j
+	return gin.H{
+		"temperature": gin.H{
+			"value": temperature,
+			"unit":  "°C",
+		},
+		"humidity": gin.H{
+			"value": humidity,
+			"unit":  "%",
+		},
+	}
 }
 
-func bmp280_sampling_json() gin.H {
-	temperature, altitude, pressure, err := bmp280_sampling()
-	j := gin.H{"temperature": temperature, "altitude": altitude, "pressure": pressure}
+func bh1750Sampling() gin.H {
+	amb, err := samplingBH1750()
 	if err != nil {
-		j["error"] = err.Error()
+		return gin.H{"error": err.Error()}
 	}
-	return j
+	return gin.H{
+		"ambient": gin.H{
+			"value": amb,
+			"unit":  "lx",
+		},
+	}
 }
 
-func aht20_sampling() (float32, float32, error) {
+func bmp280Sampling() gin.H {
+	temperature, _, pressure, err := samplingBMP280()
+	if err != nil {
+		return gin.H{"error": err.Error()}
+	}
+	return gin.H{
+		"temperature": gin.H{
+			"value": temperature,
+			"unit":  "°C",
+		},
+		"pressure": gin.H{
+			"value": pressure,
+			"unit":  "hPa",
+		},
+	}
+}
+
+func samplingAHT20() (float32, float32, error) {
 	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	logger.ChangePackageLogLevel("aht20", logger.InfoLevel)
 	bus, err := i2c.NewI2C(0x38, 1)
 	if err != nil {
 		return 0, 0, err
 	}
-	aht20 := aht20.AHT20New(bus)
-	err = aht20.ReadWithRetry(3)
+	s := aht20.NewAHT20(bus)
+	err = s.ReadWithRetry(3)
 	if err != nil {
 		return 0, 0, err
 	}
-	return aht20.Celsius(), aht20.RelHumidity(), nil
+	return s.Celsius(), s.RelHumidity(), nil
 }
 
-func bh1750_sampling() (uint16, error) {
+func samplingBH1750() (uint16, error) {
 	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	logger.ChangePackageLogLevel("bh1750", logger.InfoLevel)
 
@@ -128,10 +154,8 @@ func bh1750_sampling() (uint16, error) {
 	}
 	defer i2c.Close()
 
-	sensor := bh1750.NewBH1750()
-
-	resolution := bh1750.HighResolution
-	amb, err := sensor.MeasureAmbientLight(i2c, resolution)
+	s := bh1750.NewBH1750()
+	amb, err := s.MeasureAmbientLight(i2c, bh1750.HighResolution)
 	if err != nil {
 		return 0, err
 	}
@@ -139,7 +163,7 @@ func bh1750_sampling() (uint16, error) {
 	return amb, nil
 }
 
-func bmp280_sampling() (float32, float32, float32, error) {
+func samplingBMP280() (float32, float32, float32, error) {
 	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	logger.ChangePackageLogLevel("bsbmp", logger.InfoLevel)
 
@@ -149,20 +173,20 @@ func bmp280_sampling() (float32, float32, float32, error) {
 	}
 	defer i2c.Close()
 
-	sensor, err := bsbmp.NewBMP(bsbmp.BMP280, i2c)
+	s, err := bsbmp.NewBMP(bsbmp.BMP280, i2c)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 
-	temperature, err := sensor.ReadTemperatureC(bsbmp.ACCURACY_STANDARD)
+	temperature, err := s.ReadTemperatureC(bsbmp.ACCURACY_STANDARD)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	pressure, err := sensor.ReadPressurePa(bsbmp.ACCURACY_STANDARD)
+	pressure, err := s.ReadPressurePa(bsbmp.ACCURACY_STANDARD)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	altitude, err := sensor.ReadAltitude(bsbmp.ACCURACY_STANDARD)
+	altitude, err := s.ReadAltitude(bsbmp.ACCURACY_STANDARD)
 	if err != nil {
 		return 0, 0, 0, err
 	}

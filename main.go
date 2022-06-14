@@ -150,15 +150,19 @@ func bmp280Sampling() gin.H {
 func samplingAHT20() (float32, float32, error) {
 	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	logger.ChangePackageLogLevel("aht20", logger.InfoLevel)
+
 	bus, err := i2c.NewI2C(0x38, 1)
 	if err != nil {
 		return 0, 0, err
 	}
+	defer bus.Close()
+
 	s := aht20.NewAHT20(bus)
-	err = s.ReadWithRetry(3)
+	err = s.Read()
 	if err != nil {
 		return 0, 0, err
 	}
+
 	return s.Celsius(), s.RelHumidity(), nil
 }
 
@@ -166,14 +170,14 @@ func samplingBH1750() (uint16, error) {
 	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	logger.ChangePackageLogLevel("bh1750", logger.InfoLevel)
 
-	i2c, err := i2c.NewI2C(0x23, 1)
+	bus, err := i2c.NewI2C(0x23, 1)
 	if err != nil {
 		return 0, err
 	}
-	defer i2c.Close()
+	defer bus.Close()
 
 	s := bh1750.NewBH1750()
-	amb, err := s.MeasureAmbientLight(i2c, bh1750.HighResolution)
+	amb, err := s.MeasureAmbientLight(bus, bh1750.HighResolution)
 	if err != nil {
 		return 0, err
 	}
@@ -185,13 +189,13 @@ func samplingBMP280() (float32, float32, float32, error) {
 	logger.ChangePackageLogLevel("i2c", logger.InfoLevel)
 	logger.ChangePackageLogLevel("bsbmp", logger.InfoLevel)
 
-	i2c, err := i2c.NewI2C(0x76, 1)
+	bus, err := i2c.NewI2C(0x76, 1)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	defer i2c.Close()
+	defer bus.Close()
 
-	s, err := bsbmp.NewBMP(bsbmp.BMP280, i2c)
+	s, err := bsbmp.NewBMP(bsbmp.BMP280, bus)
 	if err != nil {
 		return 0, 0, 0, err
 	}

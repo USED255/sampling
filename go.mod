@@ -9,7 +9,7 @@ require (
 	github.com/d2r2/go-logger v0.0.0-20210606094344-60e9d1233e22
 	github.com/gin-gonic/gin v1.8.1
 	github.com/google/uuid v1.3.0
-	github.com/used255/go-aht20 v0.3.0
+	github.com/used255/go-aht20 v0.5.0
 )
 
 require (

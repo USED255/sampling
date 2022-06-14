@@ -54,6 +54,7 @@ func sampling() gin.H {
 	if isBusy {
 		j := lastSamplingData
 		j["isBusy"] = true
+		j["lastSamplingData"] = true
 		return j
 	}
 
@@ -64,28 +65,30 @@ func sampling() gin.H {
 	}
 
 	isBusy = true
-	ts1 := getUnixMillisTimestamp()
+	lastSamplingTime = getUnixMillisTimestamp()
 	j := gin.H{
 		"uuid": uuid.New().String(),
-		"ts1":  ts1,
 		"sensor": gin.H{
 			"aht20":  aht20Sampling(),
 			"bh1750": bh1750Sampling(),
 			"bmp280": bmp280Sampling(),
 		},
 	}
-	ts2 := getUnixMillisTimestamp()
-	j["ts2"] = ts2
-	lastSamplingTime = ts2
 	lastSamplingData = j
 	isBusy = false
 	return j
 }
 
 func aht20Sampling() gin.H {
+	ts1 := getUnixMillisTimestamp()
 	temperature, humidity, err := samplingAHT20()
+	ts2 := getUnixMillisTimestamp()
+	t := []int64{ts1, ts2}
 	if err != nil {
-		return gin.H{"error": err.Error()}
+		return gin.H{
+			"error":     err.Error(),
+			"timestamp": t,
+		}
 	}
 	return gin.H{
 		"temperature": gin.H{
@@ -96,26 +99,40 @@ func aht20Sampling() gin.H {
 			"value": humidity,
 			"unit":  "%",
 		},
+		"timestamp": t,
 	}
 }
 
 func bh1750Sampling() gin.H {
+	ts1 := getUnixMillisTimestamp()
 	amb, err := samplingBH1750()
+	ts2 := getUnixMillisTimestamp()
+	t := []int64{ts1, ts2}
 	if err != nil {
-		return gin.H{"error": err.Error()}
+		return gin.H{
+			"error":     err.Error(),
+			"timestamp": t,
+		}
 	}
 	return gin.H{
 		"ambient": gin.H{
 			"value": amb,
 			"unit":  "lx",
 		},
+		"timestamp": t,
 	}
 }
 
 func bmp280Sampling() gin.H {
+	ts1 := getUnixMillisTimestamp()
 	temperature, _, pressure, err := samplingBMP280()
+	ts2 := getUnixMillisTimestamp()
+	t := []int64{ts1, ts2}
 	if err != nil {
-		return gin.H{"error": err.Error()}
+		return gin.H{
+			"error":     err.Error(),
+			"timestamp": t,
+		}
 	}
 	return gin.H{
 		"temperature": gin.H{
@@ -126,6 +143,7 @@ func bmp280Sampling() gin.H {
 			"value": pressure,
 			"unit":  "hPa",
 		},
+		"timestamp": t,
 	}
 }
 

@@ -58,7 +58,7 @@ func sampling() gin.H {
 		return j
 	}
 
-	if lastSamplingTime != 0 && getUnixMillisTimestamp()-lastSamplingTime > 1000 {
+	if lastSamplingTime != 0 && getUnixMillisTimestamp()-lastSamplingTime < 1000 {
 		j := lastSamplingData
 		j["lastSamplingData"] = true
 		return j

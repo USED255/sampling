@@ -65,7 +65,6 @@ func sampling() gin.H {
 	}
 
 	isBusy = true
-	lastSamplingTime = getUnixMillisTimestamp()
 	j := gin.H{
 		"uuid": uuid.New().String(),
 		"sensor": gin.H{
@@ -75,6 +74,7 @@ func sampling() gin.H {
 		},
 	}
 	lastSamplingData = j
+	lastSamplingTime = getUnixMillisTimestamp()
 	isBusy = false
 	return j
 }

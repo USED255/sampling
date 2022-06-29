@@ -45,8 +45,8 @@ func main() {
 
 func getSampling(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"status":   http.StatusOK,
 		"sampling": sampling(),
+		"status":   http.StatusOK,
 	})
 }
 
@@ -54,24 +54,26 @@ func sampling() gin.H {
 	if isBusy {
 		j := lastSamplingData
 		j["isBusy"] = true
-		j["lastSamplingData"] = true
+		j["isLastSamplingData"] = true
 		return j
 	}
 
 	if lastSamplingTime != 0 && getUnixMillisTimestamp()-lastSamplingTime < 1000 {
 		j := lastSamplingData
-		j["lastSamplingData"] = true
+		j["isLastSamplingData"] = true
 		return j
 	}
 
 	isBusy = true
 	j := gin.H{
-		"uuid": uuid.New().String(),
 		"sensor": gin.H{
 			"aht20":  aht20Sampling(),
 			"bh1750": bh1750Sampling(),
 			"bmp280": bmp280Sampling(),
 		},
+		"timestamp": getUnixMillisTimestamp(),
+		"uuid":      uuid.New().String(),
+		"version":   1,
 	}
 	lastSamplingData = j
 	lastSamplingTime = getUnixMillisTimestamp()

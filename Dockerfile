@@ -2,8 +2,8 @@ FROM golang:1.17-alpine AS build
 
 WORKDIR /sampling
 COPY . .
-RUN go env -w CGO_ENABLED=0 &&\
-    go build -v
+RUN    go env -w CGO_ENABLED=0 \
+    && go build -v
 
 
 FROM alpine:latest

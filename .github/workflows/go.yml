@@ -1,10 +1,23 @@
 name: Go
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
+    paths:
+      - "*.go"
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/go.yml"
   pull_request:
     branches: [master]
+    paths:
+      - "*.go"
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/go.yml"
 
 jobs:
   go:

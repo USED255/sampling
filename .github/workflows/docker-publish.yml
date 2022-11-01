@@ -19,6 +19,7 @@ env:
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -78,6 +79,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   Sign:
+    name: Cosign
     runs-on: ubuntu-latest
     needs:
       - build

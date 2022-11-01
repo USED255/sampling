@@ -3,7 +3,6 @@ name: Go
 on:
   workflow_dispatch:
   push:
-    branches: [master]
     paths:
       - "*.go"
       - "**/*.go"
@@ -11,7 +10,6 @@ on:
       - "go.sum"
       - ".github/workflows/go.yml"
   pull_request:
-    branches: [master]
     paths:
       - "*.go"
       - "**/*.go"
@@ -21,6 +19,7 @@ on:
 
 jobs:
   go:
+    name: Go
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

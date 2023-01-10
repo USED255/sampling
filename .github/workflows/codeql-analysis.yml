@@ -20,15 +20,6 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/codeql-analysis.yml"
-  pull_request:
-    paths:
-      - "*.go"
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/codeql-analysis.yml"
-  schedule:
-    - cron: '34 3 * * 5'
 
 jobs:
   analyze:
